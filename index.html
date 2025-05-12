@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>SQLite with JavaScript</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <style>
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <h1>SQLite Integration with JavaScript</h1>
+
+    <!-- Input Form -->
+    <div id="input-container" style="margin: 10px 0;">
+        <input type="text" id="itemInput" placeholder="Enter an item">
+        <button onclick="addItem()">Add Item</button>
+    </div>
+
+    <!-- Table for Displaying Items -->
+    <h2>Stored Items in SQLite</h2>
+    <table id="itemTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Item</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        let db;
+
+        // Initialize SQLite database in the browser
+        async function initDb() {
+            // Load the sql.js library
+            const SQL = await initSqlJs({
+                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+            });
+
+            // Create a new database
+            db = new SQL.Database();
+
+            // Create a table to store items
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS Items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item TEXT NOT NULL
+                );
+            `);
+
+            // Refresh the table to show any initial data
+            refreshTable();
+        }
+
+        function refreshTable() {
+            // Get the table body element
+            const tableBody = document.querySelector('#itemTable tbody');
+            tableBody.innerHTML = ''; // Clear any existing rows
+
+            // Run a query to fetch all items from the database
+            const stmt = db.prepare("SELECT * FROM Items");
+            while (stmt.step()) {
+                const row = stmt.getAsObject();
+
+                // Create a new row for each item
+                const tr = document.createElement('tr');
+
+                // Add the ID column
+                const idTd = document.createElement('td');
+                idTd.textContent = row.id;
+                tr.appendChild(idTd);
+
+                // Add the item column
+                const itemTd = document.createElement('td');
+                itemTd.textContent = row.item;
+                tr.appendChild(itemTd);
+
+                // Add the actions column
+                const actionTd = document.createElement('td');
+
+                // Add an edit button
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Edit';
+                editButton.onclick = () => updateItem(row.id, row.item);
+                actionTd.appendChild(editButton);
+
+                // Add a delete button
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.style.marginLeft = '10px';
+                deleteButton.onclick = () => deleteItem(row.id);
+                actionTd.appendChild(deleteButton);
+
+                tr.appendChild(actionTd);
+
+                // Append the row to the table body
+                tableBody.appendChild(tr);
+            }
+        }
+
+        function addItem() {
+            // Get the value from the input field
+            const itemInput = document.getElementById('itemInput');
+            const newItem = itemInput.value.trim();
+
+            if (newItem) {
+                // Insert the new item into the database
+                db.exec(`
+                    INSERT INTO Items (item) VALUES ('${newItem}');
+                `);
+
+                // Clear the input field and refresh the table
+                itemInput.value = '';
+                refreshTable();
+            } else {
+                alert('The item cannot be empty!');
+            }
+        }
+
+        function updateItem(id, currentItem) {
+            // Prompt the user to edit the current item
+            const newItem = prompt('Edit item:', currentItem);
+
+            if (newItem && newItem.trim()) {
+                // Update the item in the database
+                db.exec(`
+                    UPDATE Items SET item = '${newItem.replace(/'/g, "''")}' WHERE id = ${id};
+                `);
+
+                // Refresh the table
+                refreshTable();
+            }
+        }
+
+        function deleteItem(id) {
+            // Delete the item from the database
+            db.exec(`
+                DELETE FROM Items WHERE id = ${id};
+            `);
+
+            // Refresh the table
+            refreshTable();
+        }
+
+        // Initialize the database when the page loads
+        initDb();
+    </script>
+</body>
+</html>
